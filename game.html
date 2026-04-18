@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Sci-Fi Maze</title>
+    <link rel="stylesheet" href="style.css">
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+    <div id="instructions">
+        <h1>Press click to start</h1>
+        <p>W, A, S, D to move | Mouse to look<br><br><b>SPACEBAR: Scan Path (Drains Light)</b></p>
+    </div>
+    
+    <canvas id="radarCanvas" width="200" height="200"></canvas>
+
+    <div id="ui">
+        Distance to Target: <span id="distVal">...</span><br>
+        Finder Power: <span id="powerVal">100</span>%
+    </div>
+    <div id="levelComplete">
+        OBJECT FOUND! GENERATING NEXT LEVEL...
+    </div>
+
+    <script type="module" src="game.js"></script>
+</body>
+</html>
