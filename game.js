@@ -248,7 +248,7 @@ class MazeGame {
 
     triggerPathfinder() {
         this.isPathActive = true;
-        this.spotLight.intensity = Math.max(0, this.spotLight.intensity - 15);
+        this.spotLight.intensity = Math.max(0, this.spotLight.intensity - 10);
         this.ui.power.innerText = Math.round((this.spotLight.intensity / this.maxLight) * 100);
 
         this.radarActiveTimer = 6.0;
