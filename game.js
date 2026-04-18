@@ -53,17 +53,20 @@ class MazeGame {
     }
 
     initScene() {
-        this.scene = new THREE.Scene(); // 
-        this.scene.fog = new THREE.FogExp2(0x000000, 0.15);
+        this.scene = new THREE.Scene(); // creaza scena
+        this.scene.fog = new THREE.FogExp2(0x000000, 0.15); // ceata pentru blur
 
         this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100);
         
-        this.renderer = new THREE.WebGLRenderer({ antialias: true });
+        this.renderer = new THREE.WebGLRenderer({ 
+            antialias: true 
+        });
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(this.renderer.domElement);
 
-        this.scene.add(new THREE.AmbientLight(0x050510));
+        this.scene.add(new THREE.AmbientLight(0x050510)); // lumina slaba pentru lanterna
 
+        // lanterna
         this.spotLight = new THREE.SpotLight(0x00ffcc, this.maxLight, 12, Math.PI / 6, 0.5, 2);
         this.spotLight.position.set(0, 0, 0);
         this.camera.add(this.spotLight);
@@ -71,9 +74,11 @@ class MazeGame {
         this.spotLight.target.position.set(0, 0, -1);
         this.scene.add(this.camera);
 
+        // pentru a afisa path-ul ca hint
         this.pathGroup = new THREE.Group();
         this.scene.add(this.pathGroup);
         
+        // raycaster pentru coliziuni
         this.raycaster = new THREE.Raycaster();
 
         window.addEventListener('resize', () => {
@@ -84,56 +89,62 @@ class MazeGame {
     }
 
     generateMazeLogic(width, height) {
+        // vreau dimensiuni impare pentru a avea un labirint simetric
         width = width % 2 === 0 ? width + 1 : width;
         height = height % 2 === 0 ? height + 1 : height;
 
         const maze = Array(height).fill().map(() => Array(width).fill(1));
-        const dirs = [ [0, -2], [0, 2], [-2, 0], [2, 0] ];
+        const directions = [ [0, -2], [0, 2], [-2, 0], [2, 0] ];
         
         const carve = (x, y) => {
             maze[y][x] = 0;
-            dirs.sort(() => Math.random() - 0.5);
-            for(let [dx, dy] of dirs) {
-                let nx = x + dx, ny = y + dy;
-                if (ny > 0 && ny < height - 1 && nx > 0 && nx < width - 1 && maze[ny][nx] === 1) {
+            directions.sort(() => Math.random() - 0.5);
+            for(let [dx, dy] of directions) {
+                let new_x = x + dx, new_y = y + dy;
+                if (new_y > 0 && new_y < height - 1 && new_x > 0 && new_x < width - 1 && maze[new_y][new_x] === 1) {
                     maze[y + dy / 2][x + dx / 2] = 0;
-                    carve(nx, ny);
+                    carve(new_x, new_y);
                 }
             }
         };
         carve(1, 1);
 
+        // pt a ingreuna labirintul, adaug niste bucle aleatorii
         const loopFactor = 0.08;
-        for(let r = 1; r < height - 1; r++) {
-            for(let c = 1; c < width - 1; c++) {
-                if(maze[r][c] === 1 && Math.random() < loopFactor) {
-                    if ((maze[r-1][c] === 0 && maze[r+1][c] === 0) || (maze[r][c-1] === 0 && maze[r][c+1] === 0)) {
-                        maze[r][c] = 0;
+        for(let row = 1; row < height - 1; row++) {
+            for(let column = 1; column < width - 1; column++) {
+                if(maze[row][column] === 1 && Math.random() < loopFactor) {
+                    if ((maze[row-1][column] === 0 && maze[row+1][column] === 0) || (maze[row][column-1] === 0 && maze[row][column+1] === 0)) {
+                        maze[row][column] = 0;
                     }
                 }
             }
         }
 
-        maze[1][1] = 2; // Player Start
+        maze[1][1] = 2; // pozitia de start a jucatorului
 
-        // NEW: Random Target Placement
+
+        // spawnez un obiect intr-un loc aleatoriu din labirint, cat mai departe de start
         const validSpots = [];
-        for (let r = 1; r < height - 1; r++) {
-            for (let c = 1; c < width - 1; c++) {
-                // Ensure it spawns on an open floor AND is far away from the player start (1,1)
-                if (maze[r][c] === 0 && (r + c > 15)) {
-                    validSpots.push({ r, c });
+        for (let row = 1; row < height - 1; row++) {
+            for (let column = 1; column < width - 1; column++) {
+                if (maze[row][column] === 0 && (row + column > 15)) {
+                    validSpots.push({ 
+                        r: row, 
+                        c: column 
+                    });
                 }
             }
         }
 
+        // daca am locuri valide, aleg unul random pentru target, altfel il pun in coltul opus
         if (validSpots.length > 0) {
             const randomSpot = validSpots[Math.floor(Math.random() * validSpots.length)];
             this.targetRow = randomSpot.r;
             this.targetCol = randomSpot.c;
             maze[this.targetRow][this.targetCol] = 3;
-        } else {
-            // Fallback just in case
+        } 
+        else {
             this.targetRow = height - 2;
             this.targetCol = width - 2;
             maze[this.targetRow][this.targetCol] = 3; 
@@ -145,33 +156,47 @@ class MazeGame {
     buildMaze() {
         this.mazeMap = this.generateMazeLogic(this.mazeWidth, this.mazeHeight);
         
-        const wallGeo = new THREE.BoxGeometry(this.wallSize, this.wallHeight, this.wallSize);
-        const wallMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.9 });
-        const floorMat = new THREE.MeshStandardMaterial({ color: 0x0a0a0a });
-        const floorGeo = new THREE.PlaneGeometry(this.wallSize, this.wallSize);
+        const wallGeometry = new THREE.BoxGeometry(this.wallSize, this.wallHeight, this.wallSize);
+        const wallMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0x1a1a1a, 
+            roughness: 0.9 });
+        const floorMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0x0a0a0a 
+        });
+        const floorGeometry = new THREE.PlaneGeometry(this.wallSize, this.wallSize);
 
-        for (let r = 0; r < this.mazeMap.length; r++) {
-            for(let c = 0; c < this.mazeMap[r].length; c++) {
-                const type = this.mazeMap[r][c];
-                const px = (c - this.mazeMap[r].length / 2) * this.wallSize;
-                const pz = (r - this.mazeMap.length / 2) * this.wallSize;
+        // construiesc scena pe baza matricei generate
+        for (let row = 0; row < this.mazeMap.length; row++) {
+            for(let column = 0; column < this.mazeMap[row].length; column++) {
+                const type = this.mazeMap[row][column];
 
-                const floor = new THREE.Mesh(floorGeo, floorMat);
+                // calculez pozitia in spatiu pentru fiecare celula
+                const px = (column - this.mazeMap[row].length / 2) * this.wallSize;
+                const pz = (row - this.mazeMap.length / 2) * this.wallSize;
+
+                const floor = new THREE.Mesh(floorGeometry, floorMaterial);
                 floor.rotation.x = -Math.PI / 2;
                 floor.position.set(px, 0, pz);
                 this.scene.add(floor);
             
+                // tipul 1 = perete, 2 = pozitia de start, 3 = obiectul de gasit
                 if (type === 1) {
-                    const wall = new THREE.Mesh(wallGeo, wallMat);
+                    const wall = new THREE.Mesh(wallGeometry, wallMaterial);
                     wall.position.set(px, this.wallHeight / 2, pz);
                     this.scene.add(wall);
                     this.walls.push(wall);
-                } else if(type === 2) {
+                } 
+                else if(type === 2) {
                     this.camera.position.set(px, 1.6, pz);
-                } else if(type === 3) {
-                    const targetGeo = new THREE.OctahedronGeometry(0.3);
-                    const targetMat = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xff3300, emissiveIntensity: 2 });
-                    this.targetMesh = new THREE.Mesh(targetGeo, targetMat);
+                } 
+                else if(type === 3) {
+                    const targetGeometry = new THREE.OctahedronGeometry(0.3);
+                    const targetMaterial = new THREE.MeshStandardMaterial({ 
+                        color: 0x000000, 
+                        emissive: 0xff3300, 
+                        emissiveIntensity: 2 
+                    });
+                    this.targetMesh = new THREE.Mesh(targetGeometry, targetMaterial);
                     this.targetMesh.position.set(px, 1.5, pz);
                     this.scene.add(this.targetMesh);
                 }
@@ -186,26 +211,38 @@ class MazeGame {
         
         this.controls.addEventListener('lock', () => {
             this.ui.instructions.style.display = 'none';
-            if (this.radarCanvas) this.radarCanvas.style.display = 'block';
+            
+            if (this.radarCanvas) {
+                this.radarCanvas.style.display = 'block';
+            }
         });
         
         this.controls.addEventListener('unlock', () => {
             this.ui.instructions.style.display = 'flex';
-            if (this.radarCanvas) this.radarCanvas.style.display = 'none';
+            
+            if (this.radarCanvas) {
+                this.radarCanvas.style.display = 'none';
+            }
         });
 
-        document.addEventListener('keydown', (e) => {
-            const key = e.key.toLowerCase();
-            if(this.keys.hasOwnProperty(key)) this.keys[key] = true;
+        document.addEventListener('keydown', (event) => {
+            const key = event.key.toLowerCase();
 
-            if(e.code === 'Space' && this.controls.isLocked && !this.isPathActive && this.spotLight.intensity > 0) {
+            if(this.keys.hasOwnProperty(key)) {
+                this.keys[key] = true;
+            }
+
+            if(event.code === 'Space' && this.controls.isLocked && !this.isPathActive && this.spotLight.intensity > 0) {
                 this.triggerPathfinder();
             }
         });
 
-        document.addEventListener('keyup', (e) => {
-            const key = e.key.toLowerCase();
-            if(this.keys.hasOwnProperty(key)) this.keys[key] = false;
+        document.addEventListener('keyup', (event) => {
+            const key = event.key.toLowerCase();
+            
+            if(this.keys.hasOwnProperty(key)) {
+                this.keys[key] = false;
+            }
         });
     }
 
@@ -221,11 +258,12 @@ class MazeGame {
         const pCol = Math.round(this.camera.position.x / this.wallSize + this.mazeWidth / 2);
         const pRow = Math.round(this.camera.position.z / this.wallSize + this.mazeHeight / 2);
 
-        // NEW: Send the random target coordinates to the pathfinder
         const path = this.getShortestPath(pRow, pCol, this.targetRow, this.targetCol);
 
         this.pathGroup.clear();
-        const pointMat = new THREE.MeshBasicMaterial({ color: 0x00ffcc });
+        const pointMat = new THREE.MeshBasicMaterial({ 
+            color: 0x00ffcc 
+        });
         const pointGeo = new THREE.SphereGeometry(0.15);
 
         path.forEach(p => {
@@ -247,23 +285,29 @@ class MazeGame {
         const cameFrom = new Map();
         cameFrom.set(`${startRow},${startCol}`, null);
         
+        // BFS pentru a gasi cel mai scurt drum de la pozitia jucatorului la tinta
         while (queue.length > 0) {
             const [row, col] = queue.shift();
-            if (row === endRow && col === endCol) break;
+            
+            if (row === endRow && col === endCol) {
+                break;
+            }
 
-            const dirs = [[0, 1], [1, 0], [0, -1], [-1, 0]];
-            for(let [dr, dc] of dirs) {
-                const nr = row + dr, nc = col + dc;
-                if (nr >= 0 && nr < this.mazeHeight && nc >= 0 && nc < this.mazeWidth && this.mazeMap[nr][nc] !== 1) {
-                    const key = `${nr},${nc}`;
+            const directions = [[0, 1], [1, 0], [0, -1], [-1, 0]];
+            for(let [dr, dc] of directions) {
+                const new_row = row + dr, new_col = col + dc;
+
+                if (new_row >= 0 && new_row < this.mazeHeight && new_col >= 0 && new_col < this.mazeWidth && this.mazeMap[new_row][new_col] !== 1) {
+                    const key = `${new_row},${new_col}`;
                     if (!cameFrom.has(key)) {
                         cameFrom.set(key, `${row},${col}`);
-                        queue.push([nr, nc]);
+                        queue.push([new_row, new_col]);
                     }
                 }
             }
         }
 
+        // reconstruiesc path-ul de la tinta la jucator folosind cameFrom
         let current = `${endRow},${endCol}`;
         const path = [];
         while (current !== null && current !== "undefined,undefined") {
@@ -271,11 +315,15 @@ class MazeGame {
             path.push({row, column});
             current = cameFrom.get(current);
         }
+
         return path.reverse();
     }
 
     drawRadar(delta) {
-        if (!this.ctx) return;
+        if (!this.ctx) {
+            return;
+        }
+
         const w = this.radarCanvas.width;
         const h = this.radarCanvas.height;
         const cellSize = w / this.mazeWidth;
@@ -301,10 +349,10 @@ class MazeGame {
             this.ctx.clip(); 
 
             this.ctx.fillStyle = 'rgba(0, 255, 204, 0.4)';
-            for (let r = 0; r < this.mazeHeight; r++) {
-                for (let c = 0; c < this.mazeWidth; c++) {
-                    if (this.mazeMap[r][c] === 1) {
-                        this.ctx.fillRect(c * cellSize, r * cellSize, cellSize, cellSize);
+            for (let row = 0; row < this.mazeHeight; row++) {
+                for (let col = 0; col < this.mazeWidth; col++) {
+                    if (this.mazeMap[row][col] === 1) {
+                        this.ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
                     }
                 }
             }
@@ -329,7 +377,6 @@ class MazeGame {
                 this.ctx.stroke();
             }
 
-            // NEW: Use random target coordinates for the radar ping
             const distToTarget = Math.sqrt(Math.pow(pCol - this.targetCol, 2) + Math.pow(pRow - this.targetRow, 2));
             if (this.radarSweepRadius >= distToTarget && this.targetRevealTimer <= 0) {
                 this.targetRevealTimer = 4.0;
@@ -351,9 +398,11 @@ class MazeGame {
 
             const batteryPercent = this.spotLight.intensity / this.maxLight;
             let showPlayer = true;
+            
             if (batteryPercent < 0.5) { 
                 showPlayer = Math.random() < (batteryPercent * 2); 
             }
+
             if (showPlayer) {
                 this.ctx.fillStyle = '#ffffff';
                 this.ctx.beginPath();
@@ -364,7 +413,10 @@ class MazeGame {
     }
 
     animate() {
-        if(this.isLevelComplete) return;
+        if(this.isLevelComplete) {
+            return;
+        }
+
         requestAnimationFrame(this.animate);
 
         const time = performance.now();
@@ -397,8 +449,12 @@ class MazeGame {
             this.direction.normalize();
 
             const speed = 30.0;
-            if(this.keys.w || this.keys.s) this.velocity.z -= this.direction.z * speed * delta;
-            if(this.keys.a || this.keys.d) this.velocity.x -= this.direction.x * speed * delta;
+            if(this.keys.w || this.keys.s) {
+                this.velocity.z -= this.direction.z * speed * delta;
+            }
+            if(this.keys.a || this.keys.d) {
+                this.velocity.x -= this.direction.x * speed * delta;
+            }
 
             const playerDir = new THREE.Vector3();
             this.camera.getWorldDirection(playerDir);
