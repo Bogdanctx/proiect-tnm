@@ -51,11 +51,13 @@ class MazeGame {
         this.radarActiveTimer = 0; 
         this.targetRevealTimer = 0;
 
+        this.animate = this.animate.bind(this);
+    }
+
+    run() {
         this.initScene();
         this.buildMaze();
         this.setupControls();
-        
-        this.animate = this.animate.bind(this);
         this.animate();
     }
 
@@ -163,10 +165,10 @@ class MazeGame {
         const wallGeometry = new THREE.BoxGeometry(this.wallSize, this.wallHeight, this.wallSize);
         const wallMaterial = new THREE.MeshStandardMaterial({ 
             color: 0x1a1a1a, 
-            roughness: 0.9 
+            roughness: 1.2
         });
         const floorMaterial = new THREE.MeshStandardMaterial({ 
-            color: 0x0a0a0a 
+            color: 0x0a0a0a
         });
         const floorGeometry = new THREE.PlaneGeometry(this.wallSize, this.wallSize);
 
@@ -180,21 +182,28 @@ class MazeGame {
                 const pz = (row - this.mazeMap.length / 2) * this.wallSize;
 
                 const floor = new THREE.Mesh(floorGeometry, floorMaterial);
-                floor.rotation.x = -Math.PI / 2;
+                floor.rotation.x = -Math.PI / 2; // rotire pentru a fi orizontal
                 floor.position.set(px, 0, pz);
                 this.scene.add(floor);
             
-                // tipul 1 = perete, 2 = pozitia de start, 3 = obiectul de gasit
-                if (type === 1) {
+                if (type === this.mazeObjects.WALL) {
                     const wall = new THREE.Mesh(wallGeometry, wallMaterial);
                     wall.position.set(px, this.wallHeight / 2, pz);
                     this.scene.add(wall);
                     this.walls.push(wall);
                 } 
-                else if(type === 2) {
+                else if(type === this.mazeObjects.START) {
                     this.camera.position.set(px, 1.6, pz);
+
+                    // setez directia initiala a camerei catre un spatiu gol pentru a nu ma uita direct in perete cand incepe jocul
+                    if (this.mazeMap[row + 1][column] === this.mazeObjects.EMPTY) {
+                        this.camera.lookAt(px, 1.6, pz + this.wallSize);
+                    } 
+                    else if (this.mazeMap[row][column + 1] === this.mazeObjects.EMPTY) {
+                        this.camera.lookAt(px + this.wallSize, 1.6, pz);
+                    }
                 } 
-                else if(type === 3) {
+                else if(type === this.mazeObjects.TARGET) {
                     const targetGeometry = new THREE.OctahedronGeometry(0.3);
                     const targetMaterial = new THREE.MeshStandardMaterial({ 
                         color: 0x000000, 
@@ -237,7 +246,8 @@ class MazeGame {
                 this.keys[key] = true;
             }
 
-            if(event.code === 'Space' && this.controls.isLocked && !this.isPathActive && this.spotLight.intensity > 0) {
+            // daca apas space, lanterna are baterie, pathfinder-ul nu e deja activ si player-ul are controlul, atunci activez pathfinder-ul care arata drumul catre tinta pentru cateva secunde
+            if(event.code === 'Space' && this.controls.isLocked && !this.isPathActive && this.spotLight.intensity > 20) {
                 this.triggerPathfinder();
             }
         });
@@ -279,6 +289,7 @@ class MazeGame {
             this.pathGroup.add(point);
         });
 
+        // dupa 6 secunde, sterg path-ul si dezactivez pathfinder-ul
         setTimeout(() => {
             this.pathGroup.clear();
             this.isPathActive = false;
@@ -286,9 +297,11 @@ class MazeGame {
     }
 
     getShortestPath(startRow, startCol, endRow, endCol) {
-        const queue = [[startRow, startCol]];
-        const cameFrom = new Map();
-        cameFrom.set(`${startRow},${startCol}`, null);
+        let queue = [[startRow, startCol]];
+        let cameFrom = []
+        
+        cameFrom[startRow] = [];
+        cameFrom[startRow][startCol] = null;
         
         // BFS pentru a gasi cel mai scurt drum de la pozitia jucatorului la tinta
         while (queue.length > 0) {
@@ -299,26 +312,34 @@ class MazeGame {
             }
 
             const directions = [[0, 1], [1, 0], [0, -1], [-1, 0]];
-            for(let [dr, dc] of directions) {
-                const new_row = row + dr, new_col = col + dc;
 
-                if (new_row >= 0 && new_row < this.mazeHeight && new_col >= 0 && new_col < this.mazeWidth && this.mazeMap[new_row][new_col] !== 1) {
-                    const key = `${new_row},${new_col}`;
-                    if (!cameFrom.has(key)) {
-                        cameFrom.set(key, `${row},${col}`);
-                        queue.push([new_row, new_col]);
+            for(let [dr, dc] of directions) {
+                const new_row = row + dr;
+                const new_col = col + dc;
+
+                if (this.isValidCell(new_row, new_col) && this.mazeMap[new_row][new_col] !== this.mazeObjects.WALL) {
+                    
+                    if (!cameFrom[new_row]) {
+                        cameFrom[new_row] = [];
                     }
+
+                    if (cameFrom[new_row][new_col] === undefined) {
+                        queue.push([new_row, new_col]);
+                        cameFrom[new_row][new_col] = [row, col];
+                    }
+
                 }
             }
         }
 
         // reconstruiesc path-ul de la tinta la jucator folosind cameFrom
-        let current = `${endRow},${endCol}`;
-        const path = [];
-        while (current !== null && current !== "undefined,undefined") {
-            const [row, column] = current.split(',').map(Number);
+        let current = [endRow, endCol];
+        let path = [];
+
+        while (current !== null) {
+            const [row, column] = current;
             path.push({row, column});
-            current = cameFrom.get(current);
+            current = cameFrom[row][column];
         }
 
         return path.reverse();
@@ -461,18 +482,10 @@ class MazeGame {
                 this.velocity.x -= this.direction.x * speed * delta;
             }
 
-            const playerDir = new THREE.Vector3();
-            this.camera.getWorldDirection(playerDir);
-            playerDir.y = 0;
-            playerDir.normalize();
+            // coliziuni
 
-            // BUG: pot sa trec prin pereti daca apas A sau D in timp ce ma apropii lateral de un perete pentru ca raycaster-ul verifica doar in fata
-            this.raycaster.set(this.camera.position, playerDir);
-            const intersects = this.raycaster.intersectObjects(this.walls);
 
-            if(intersects.length > 0 && intersects[0].distance < 0.6 && this.velocity.z < 0) {
-                this.velocity.z = 0;
-            }
+            //////
 
             this.controls.moveRight(-this.velocity.x * delta);
             this.controls.moveForward(-this.velocity.z * delta);
@@ -483,4 +496,7 @@ class MazeGame {
     }
 }
 
-new MazeGame();
+window.onload = () => {
+    let game = new MazeGame();
+    game.run();
+};
