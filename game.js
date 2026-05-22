@@ -52,6 +52,19 @@ class MazeGame {
         this.targetRevealTimer = 0;
 
         this.animate = this.animate.bind(this);
+
+        // pentru a afisa urmele pasilor jucatorului
+        this.footprints = [];
+        this.maxFootprints = 25;
+        this.lastFootprintPosition = new THREE.Vector3();
+
+        this.footprintGeo = new THREE.PlaneGeometry(0.4, 0.4);
+        this.footprintMat = new THREE.MeshBasicMaterial({ 
+            color: 0x00ffcc, 
+            transparent: true, 
+            opacity: 0.2,
+            depthWrite: false // Prevents sorting glitches
+        });
     }
 
     run() {
@@ -91,6 +104,25 @@ class MazeGame {
             this.camera.updateProjectionMatrix();
             this.renderer.setSize(window.innerWidth, window.innerHeight);
         });
+    }
+
+    dropFootprint() {
+        const mark = new THREE.Mesh(this.footprintGeo, this.footprintMat);
+
+        mark.position.set(this.camera.position.x, 0.01, this.camera.position.z);
+        mark.rotation.x = -Math.PI / 2;
+
+        const euler = new THREE.Euler(0, 0, 0, 'YXZ');
+        euler.setFromQuaternion(this.camera.quaternion);
+        mark.rotation.z = euler.y;
+
+        this.scene.add(mark);
+        this.footprints.push(mark);
+
+        if (this.footprints.length > this.maxFootprints) {
+            const oldMark = this.footprints.shift();
+            this.scene.remove(oldMark);
+        }
     }
 
     isValidCell(row, column) {
@@ -525,6 +557,12 @@ class MazeGame {
 
             this.controls.moveRight(-this.velocity.x * delta);
             this.controls.moveForward(-this.velocity.z * delta);
+
+            if (this.camera.position.distanceTo(this.lastFootprintPosition) > 1.5) {
+                this.dropFootprint();
+                this.lastFootprintPosition.copy(this.camera.position);
+            }
+
         }
 
         this.renderer.render(this.scene, this.camera);
