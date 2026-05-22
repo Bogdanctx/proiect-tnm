@@ -565,34 +565,27 @@ class MazeGame {
         this.drawRadar(delta);
 
         if (this.controls.isLocked) {
-            if (!this.hasTheSwitch) {
-                const distanceToSwitch = this.camera.position.distanceTo(this.switchMesh.position);
-                this.ui.distance.innerText = distanceToSwitch.toFixed(1);
+            const targetPosition = !this.hasTheSwitch ? this.switchMesh.position : this.routerMesh.position;
+            const currentDistance = this.camera.position.distanceTo(targetPosition);
+            this.ui.distance.innerText = currentDistance.toFixed(1);
 
-                if (distanceToSwitch < 1.5) {
+            const beepBpm = this.distanceToBpm(currentDistance);
+            try {
+                updateSlider_beep_bpm(beepBpm);
+            } catch {
+                // Audio not started
+            }
+
+            if (!this.hasTheSwitch) {
+                if (currentDistance < 1.5) {
                     this.hasTheSwitch = true;
                     this.scene.remove(this.switchMesh);
                     this.ui.objective.innerText = 'Pasul 2: Gaseste router-ul!';
                     return;
                 }
-            }
+            } 
             else {
-                const distanceToRouter = this.camera.position.distanceTo(this.routerMesh.position);
-                this.ui.distance.innerText = distanceToRouter.toFixed(1);
-
-            const distance = this.camera.position.distanceTo(this.targetMesh.position);
-            this.ui.distance.innerText = distance.toFixed(1);
-
-            const beepBpm = this.distanceToBpm(distance);
-            // console.log(`Distance: ${distance.toFixed(2)}, BPM: ${beepBpm.toFixed(0)}`);
-            try{
-                updateSlider_beep_bpm(beepBpm);
-            }
-            catch{
-                // Audio not started
-            }
-
-            if (distanceToRouter < 1.5) {
+                if (currentDistance < 1.5) {
                     this.isLevelComplete = true;
                     this.controls.unlock();
                     this.ui.levelComplete.style.display = 'flex';
