@@ -3,6 +3,8 @@ import { PointerLockControls } from 'three/addons/controls/PointerLockControls.j
 
 class MazeGame {
     constructor() {
+        const textureLoader = new THREE.TextureLoader();
+
         // dimensiuni labirint
         this.mazeWidth = 25;
         this.mazeHeight = 25;
@@ -14,7 +16,8 @@ class MazeGame {
             EMPTY: 0,
             WALL: 1,
             START: 2,
-            TARGET: 3
+            SWITCH: 3,
+            ROUTER: 4
         }
         
         
@@ -32,18 +35,38 @@ class MazeGame {
         this.walls = []; // pentru coliziuni
         this.mazeMap = []; // matricea care reprezinta labirintul
 
-        // pozitie obiect de cautat
-        this.targetRow = 0;
-        this.targetCol = 0;
+        // pozitie switch
+        const switchTexture = textureLoader.load('switch.png');
+        this.switchMaterial = new THREE.SpriteMaterial({
+            map: switchTexture,
+            transparent: true
+        })
+        this.switchRow = 0;
+        this.switchColumn = 0;
+        this.hasTheSwitch = false;
+        
+        // pozitie router
+        const routerTexture = textureLoader.load('router.png');
+        this.routerMaterial = new THREE.SpriteMaterial({
+            map: routerTexture,
+            transparent: true
+        })
+        this.routerRow = 0;
+        this.routerColumn = 0;
+        this.hasTheRouter = false;
+
+
+
 
         // elementele de ui
         this.ui = {
             instructions: document.getElementById('instructions'),
             distance: document.getElementById('distVal'),
             power: document.getElementById('powerVal'),
-            levelComplete: document.getElementById('levelComplete')
+            levelComplete: document.getElementById('levelComplete'),
+            objective: document.getElementById('objective'),
+            finishGif: document.getElementById('finishGif')
         };
-        const textureLoader = new THREE.TextureLoader();
 
         // variabile pt radar
         this.radarCanvas = document.getElementById('radarCanvas');
@@ -185,10 +208,15 @@ class MazeGame {
         }
 
         // aleg random un loc din validSpots pentru a plasa tinta
-        const randomSpot = validSpots[Math.floor(Math.random() * validSpots.length)];
-        this.targetRow = randomSpot.r;
-        this.targetCol = randomSpot.c;
-        maze[this.targetRow][this.targetCol] = this.mazeObjects.TARGET;
+        const randomSwitchSpot = validSpots[Math.floor(Math.random() * validSpots.length)];
+        this.switchRow = randomSwitchSpot.r;
+        this.switchColumn = randomSwitchSpot.c;
+        maze[this.switchRow][this.switchColumn] = this.mazeObjects.SWITCH;
+
+        const randomRouterSpot = validSpots[Math.floor(Math.random() * validSpots.length)];
+        this.routerRow = randomRouterSpot.r;
+        this.routerColumn = randomRouterSpot.c;
+        maze[this.routerRow][this.routerColumn] = this.mazeObjects.ROUTER
 
         return maze;
     }
@@ -219,34 +247,47 @@ class MazeGame {
                 floor.rotation.x = -Math.PI / 2; // rotire pentru a fi orizontal
                 floor.position.set(px, 0, pz);
                 this.scene.add(floor);
-            
-                if (type === this.mazeObjects.WALL) {
-                    const wall = new THREE.Mesh(wallGeometry, wallMaterial);
-                    wall.position.set(px, this.wallHeight / 2, pz);
-                    this.scene.add(wall);
-                    this.walls.push(wall);
-                } 
-                else if(type === this.mazeObjects.START) {
-                    this.camera.position.set(px, 1.6, pz);
 
-                    // setez directia initiala a camerei catre un spatiu gol pentru a nu ma uita direct in perete cand incepe jocul
-                    if (this.mazeMap[row + 1][column] === this.mazeObjects.EMPTY) {
-                        this.camera.lookAt(px, 1.6, pz + this.wallSize);
-                    } 
-                    else if (this.mazeMap[row][column + 1] === this.mazeObjects.EMPTY) {
-                        this.camera.lookAt(px + this.wallSize, 1.6, pz);
+                switch(type) {
+                    case this.mazeObjects.WALL: {
+                        const wall = new THREE.Mesh(wallGeometry, wallMaterial);
+                        wall.position.set(px, this.wallHeight / 2, pz);
+                        this.scene.add(wall);
+                        this.walls.push(wall);
+                        break;
                     }
-                } 
-                else if(type === this.mazeObjects.TARGET) {
-                    const targetGeometry = new THREE.OctahedronGeometry(0.3);
-                    const targetMaterial = new THREE.MeshStandardMaterial({ 
-                        color: 0x000000, 
-                        emissive: 0xff3300, 
-                        emissiveIntensity: 2 
-                    });
-                    this.targetMesh = new THREE.Mesh(targetGeometry, targetMaterial);
-                    this.targetMesh.position.set(px, 1.5, pz);
-                    this.scene.add(this.targetMesh);
+                    
+                    case this.mazeObjects.START: {
+                        this.camera.position.set(px, 1.6, pz);
+
+                        // setez directia initiala a camerei catre un spatiu gol pentru a nu ma uita direct in perete cand incepe jocul
+                        if (this.mazeMap[row + 1][column] === this.mazeObjects.EMPTY) {
+                            this.camera.lookAt(px, 1.6, pz + this.wallSize);
+                        } 
+                        else if (this.mazeMap[row][column + 1] === this.mazeObjects.EMPTY) {
+                            this.camera.lookAt(px + this.wallSize, 1.6, pz);
+                        }
+                        break;
+                    }
+
+                    case this.mazeObjects.SWITCH: {
+                        this.switchMesh = new THREE.Sprite(this.switchMaterial);
+                        this.switchMesh.position.set(1.5, 1.5, 1);
+                        this.switchMesh.position.set(px, 0.8, pz);
+                        this.scene.add(this.switchMesh);
+                        break;
+                    }
+
+                    case this.mazeObjects.ROUTER: {
+                        this.routerMesh = new THREE.Sprite(this.routerMaterial);
+                        this.routerMesh.position.set(1.5, 1.5, 1);
+                        this.routerMesh.position.set(px, 0.8, pz);
+                        this.scene.add(this.routerMesh);
+                        break;
+                    }
+
+                    default:
+                        break;
                 }
             }
         }
@@ -307,7 +348,14 @@ class MazeGame {
         const pCol = Math.round(this.camera.position.x / this.wallSize + this.mazeWidth / 2);
         const pRow = Math.round(this.camera.position.z / this.wallSize + this.mazeHeight / 2);
 
-        const path = this.getShortestPath(pRow, pCol, this.targetRow, this.targetCol);
+        let path = [];
+
+        if (!this.hasTheSwitch) {
+            path = this.getShortestPath(pRow, pCol, this.switchRow, this.switchColumn);
+        }
+        else {
+            path = this.getShortestPath(pRow, pCol, this.routerRow, this.routerColumn);
+        }
 
         this.pathGroup.clear();
         const pointMat = new THREE.MeshBasicMaterial({ 
@@ -437,7 +485,10 @@ class MazeGame {
                 this.ctx.stroke();
             }
 
-            const distToTarget = Math.sqrt(Math.pow(pCol - this.targetCol, 2) + Math.pow(pRow - this.targetRow, 2));
+            const targetCol = this.hasTheSwitch ? this.routerColumn : this.switchColumn;
+            const targetRow = this.hasTheSwitch ? this.routerRow : this.switchRow;
+
+            const distToTarget = Math.sqrt(Math.pow(pCol - targetCol, 2) + Math.pow(pRow - targetRow, 2));
             if (this.radarSweepRadius >= distToTarget && this.targetRevealTimer <= 0) {
                 this.targetRevealTimer = 4.0;
             }
@@ -447,12 +498,12 @@ class MazeGame {
                 
                 this.ctx.fillStyle = '#ff3300';
                 this.ctx.beginPath();
-                this.ctx.arc(this.targetCol * cellSize, this.targetRow * cellSize, 4, 0, Math.PI * 2);
+                this.ctx.arc(targetCol * cellSize, targetRow * cellSize, 4, 0, Math.PI * 2);
                 this.ctx.fill();
                 
                 this.ctx.strokeStyle = '#ff3300';
                 this.ctx.beginPath();
-                this.ctx.arc(this.targetCol * cellSize, this.targetRow * cellSize, 6 + Math.sin(performance.now() * 0.01) * 2, 0, Math.PI * 2);
+                this.ctx.arc(targetCol * cellSize, targetRow * cellSize, 6 + Math.sin(performance.now() * 0.01) * 2, 0, Math.PI * 2);
                 this.ctx.stroke();
             }
 
@@ -485,20 +536,30 @@ class MazeGame {
         this.drawRadar(delta);
 
         if (this.controls.isLocked) {
-            if (this.targetMesh) {
-                this.targetMesh.rotation.y += 1 * delta;
-                this.targetMesh.rotation.x += 0.5 * delta;
+            if (!this.hasTheSwitch) {
+                const distanceToSwitch = this.camera.position.distanceTo(this.switchMesh.position);
+                this.ui.distance.innerText = distanceToSwitch.toFixed(1);
+
+                if (distanceToSwitch < 1.5) {
+                    this.hasTheSwitch = true;
+                    this.scene.remove(this.switchMesh);
+                    this.ui.objective.innerText = 'Pasul 2: Gaseste router-ul!';
+                    return;
+                }
             }
+            else {
+                const distanceToRouter = this.camera.position.distanceTo(this.routerMesh.position);
+                this.ui.distance.innerText = distanceToRouter.toFixed(1);
 
-            const distance = this.camera.position.distanceTo(this.targetMesh.position);
-            this.ui.distance.innerText = distance.toFixed(1);
-
-            if (distance < 1.5) {
-                this.isLevelComplete = true;
-                this.controls.unlock();
-                this.ui.levelComplete.style.display = 'flex';
-                setTimeout(() => location.reload(), 2000);
-                return;
+                if (distanceToRouter < 1.5) {
+                    this.isLevelComplete = true;
+                    this.controls.unlock();
+                    this.ui.levelComplete.style.display = 'flex';
+                    this.ui.finishGif.style.display = 'block';
+                    
+                    setTimeout(() => location.reload(), 8000); 
+                    return;
+                }
             }
 
             this.velocity.x -= this.velocity.x * 10.0 * delta;
