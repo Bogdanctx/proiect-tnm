@@ -323,7 +323,10 @@ class MazeGame {
                 this.radarCanvas.style.display = 'block';
             }
 
-            updateSlider_beep_toggle(1.0);
+            try{
+                updateSlider_beep_toggle(1.0);
+            }
+            catch{}
         });
         
         this.controls.addEventListener('unlock', () => {
@@ -332,7 +335,10 @@ class MazeGame {
             if (this.radarCanvas) {
                 this.radarCanvas.style.display = 'none';
             }
-            updateSlider_beep_toggle(0.0);
+            try{
+                updateSlider_beep_toggle(0.0);
+            }
+            catch{}
         });
 
         document.addEventListener('keydown', (event) => {

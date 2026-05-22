@@ -2,13 +2,14 @@ var heavyModule = null;
 var loader = null;
 midioutPort = null;
 
-window.onload = function () {
+window.addEventListener("load", function () {
+    console.log("Loading Heavy module...");
     heavy_Module().then(loadedModule => {
         heavyModule = loadedModule;
         moduleLoaded();
     });
     // document.getElementById("transportButton").style.visibility = "hidden";
-}
+});
 
 function moduleLoaded() {
     loader = new heavyModule.AudioLibLoader();
