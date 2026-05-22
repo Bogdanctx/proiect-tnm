@@ -8,7 +8,7 @@ class MazeGame {
         this.mazeHeight = 25;
         this.wallSize = 2.5;
         this.wallHeight = 4.0;
-        this.maxLight = 60;
+        this.maxLight = 100;
         
         
         this.isLevelComplete = false;
@@ -22,8 +22,8 @@ class MazeGame {
         this.velocity = new THREE.Vector3();
         this.direction = new THREE.Vector3();
         this.prevTime = performance.now();
-        this.walls = [];
-        this.mazeMap = [];
+        this.walls = []; // pentru coliziuni
+        this.mazeMap = []; // matricea care reprezinta labirintul (0 = spatiu liber, 1 = perete, 2 = start, 3 = target)
 
         // pozitie obiect de cautat
         this.targetRow = 0;
@@ -39,7 +39,7 @@ class MazeGame {
 
         // variabile pt radar
         this.radarCanvas = document.getElementById('radarCanvas');
-        this.ctx = this.radarCanvas ? this.radarCanvas.getContext('2d') : null;
+        this.ctx = this.radarCanvas.getContext('2d');
         this.radarSweepRadius = 0;
         this.radarActiveTimer = 0; 
         this.targetRevealTimer = 0;
@@ -58,13 +58,9 @@ class MazeGame {
 
         this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100);
         
-        this.renderer = new THREE.WebGLRenderer({ 
-            antialias: true 
-        });
+        this.renderer = new THREE.WebGLRenderer();
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(this.renderer.domElement);
-
-        this.scene.add(new THREE.AmbientLight(0x050510)); // lumina slaba pentru lanterna
 
         // lanterna
         this.spotLight = new THREE.SpotLight(0x00ffcc, this.maxLight, 12, Math.PI / 6, 0.5, 2);
@@ -89,13 +85,14 @@ class MazeGame {
     }
 
     generateMazeLogic(width, height) {
-        // vreau dimensiuni impare pentru a avea un labirint simetric
         width = width % 2 === 0 ? width + 1 : width;
         height = height % 2 === 0 ? height + 1 : height;
 
-        const maze = Array(height).fill().map(() => Array(width).fill(1));
+        const maze = Array(height).fill().map(() => Array(width).fill(1)); // maze = matrice initiala plina de pereti
         const directions = [ [0, -2], [0, 2], [-2, 0], [2, 0] ];
-        
+
+        // aplic dfs pentru a genera un labirint perfect (fara bucle) 
+        // si apoi adaug niste bucle random
         const carve = (x, y) => {
             maze[y][x] = 0;
             directions.sort(() => Math.random() - 0.5);
@@ -109,7 +106,7 @@ class MazeGame {
         };
         carve(1, 1);
 
-        // pt a ingreuna labirintul, adaug niste bucle aleatorii
+        // adaug niste bucle random
         const loopFactor = 0.08;
         for(let row = 1; row < height - 1; row++) {
             for(let column = 1; column < width - 1; column++) {
@@ -124,11 +121,11 @@ class MazeGame {
         maze[1][1] = 2; // pozitia de start a jucatorului
 
 
-        // spawnez un obiect intr-un loc aleatoriu din labirint, cat mai departe de start
+        // spawnez un obiect intr-un loc random din labirint, cat mai departe de start
         const validSpots = [];
         for (let row = 1; row < height - 1; row++) {
             for (let column = 1; column < width - 1; column++) {
-                if (maze[row][column] === 0 && (row + column > 15)) {
+                if (maze[row][column] === 0 && row + column > 15) {
                     validSpots.push({ 
                         r: row, 
                         c: column 
@@ -137,18 +134,11 @@ class MazeGame {
             }
         }
 
-        // daca am locuri valide, aleg unul random pentru target, altfel il pun in coltul opus
-        if (validSpots.length > 0) {
-            const randomSpot = validSpots[Math.floor(Math.random() * validSpots.length)];
-            this.targetRow = randomSpot.r;
-            this.targetCol = randomSpot.c;
-            maze[this.targetRow][this.targetCol] = 3;
-        } 
-        else {
-            this.targetRow = height - 2;
-            this.targetCol = width - 2;
-            maze[this.targetRow][this.targetCol] = 3; 
-        }
+        // aleg random un loc din validSpots pentru a plasa tinta
+        const randomSpot = validSpots[Math.floor(Math.random() * validSpots.length)];
+        this.targetRow = randomSpot.r;
+        this.targetCol = randomSpot.c;
+        maze[this.targetRow][this.targetCol] = 3;
 
         return maze;
     }
@@ -159,7 +149,8 @@ class MazeGame {
         const wallGeometry = new THREE.BoxGeometry(this.wallSize, this.wallHeight, this.wallSize);
         const wallMaterial = new THREE.MeshStandardMaterial({ 
             color: 0x1a1a1a, 
-            roughness: 0.9 });
+            roughness: 0.9 
+        });
         const floorMaterial = new THREE.MeshStandardMaterial({ 
             color: 0x0a0a0a 
         });
@@ -461,6 +452,7 @@ class MazeGame {
             playerDir.y = 0;
             playerDir.normalize();
 
+            // BUG: pot sa trec prin pereti daca apas A sau D in timp ce ma apropii lateral de un perete pentru ca raycaster-ul verifica doar in fata
             this.raycaster.set(this.camera.position, playerDir);
             const intersects = this.raycaster.intersectObjects(this.walls);
 
