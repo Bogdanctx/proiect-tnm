@@ -43,6 +43,7 @@ class MazeGame {
             power: document.getElementById('powerVal'),
             levelComplete: document.getElementById('levelComplete')
         };
+        const textureLoader = new THREE.TextureLoader();
 
         // variabile pt radar
         this.radarCanvas = document.getElementById('radarCanvas');
@@ -54,16 +55,17 @@ class MazeGame {
         this.animate = this.animate.bind(this);
 
         // pentru a afisa urmele pasilor jucatorului
+        const footprintTexture = textureLoader.load('footprint.png');
         this.footprints = [];
         this.maxFootprints = 25;
         this.lastFootprintPosition = new THREE.Vector3();
 
         this.footprintGeo = new THREE.PlaneGeometry(0.4, 0.4);
         this.footprintMat = new THREE.MeshBasicMaterial({ 
-            color: 0x00ffcc, 
+            map: footprintTexture,
             transparent: true, 
             opacity: 0.2,
-            depthWrite: false // Prevents sorting glitches
+            depthWrite: false
         });
     }
 
