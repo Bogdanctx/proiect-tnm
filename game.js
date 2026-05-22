@@ -484,6 +484,42 @@ class MazeGame {
 
             // coliziuni
 
+            const directionForward = new THREE.Vector3();
+            this.camera.getWorldDirection(directionForward);
+            directionForward.y = 0;
+            directionForward.normalize();
+
+            // calculez directiile laterale pentru a putea face coliziuni si cand ma misc lateral
+            const directionRight = new THREE.Vector3().crossVectors(directionForward, this.camera.up).normalize();
+            const directionBackward = directionForward.clone().negate();
+            const directionLeft = directionRight.clone().negate();
+
+
+            const checkIsWall = (direction) => {
+                this.raycaster.set(this.camera.position, direction);
+                const hits = this.raycaster.intersectObjects(this.walls);
+                return hits.length > 0 && hits[0].distance < 1.0;
+            }
+
+            // daca am perete in fata si incerc sa merg inainte, opresc miscarea
+            if (checkIsWall(directionForward) && this.velocity.z < 0) {
+                this.velocity.z = 0;
+            }
+
+            // daca am perete in spate si incerc sa merg inapoi, opresc miscarea
+            if (checkIsWall(directionBackward) && this.velocity.z > 0) {
+                this.velocity.z = 0;
+            }
+
+            // daca am perete in dreapta si incerc sa merg spre dreapta, opresc miscarea
+            if (checkIsWall(directionRight) && this.velocity.x < 0) {
+                this.velocity.x = 0;
+            }
+
+            // daca am perete in stanga si incerc sa merg spre stanga, opresc miscarea
+            if (checkIsWall(directionLeft) && this.velocity.x > 0) {
+                this.velocity.x = 0;
+            }
 
             //////
 
