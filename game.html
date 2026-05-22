@@ -12,11 +12,23 @@
             }
         }
     </script>
+
+    <!-- Generated javascript library includes -->
+    <script type="application/javascript" src="heavy.js"></script>
+
+
+    <script type="text/javascript" src="pdInit.js"></script>
+
+    
 </head>
 <body>
+    
     <div id="instructions">
         <h1>Press click to start</h1>
         <p>W, A, S, D to move | Mouse to look<br><br><b>SPACEBAR: Scan Path (Drains Light)</b></p>
+
+        <p>Enable Sound</p>
+        <input type="checkbox" id="transportButton" onchange="toggleTransport();" class="preventEvent">
     </div>
     
     <canvas id="radarCanvas" width="200" height="200"></canvas>
@@ -24,6 +36,7 @@
     <div id="ui">
         Distance to Target: <span id="distVal">...</span><br>
         Finder Power: <span id="powerVal">100</span>%
+        
     </div>
     <div id="levelComplete">
         OBJECT FOUND! GENERATING NEXT LEVEL...

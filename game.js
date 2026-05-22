@@ -37,6 +37,12 @@ class MazeGame {
             levelComplete: document.getElementById('levelComplete')
         };
 
+        this.pd = {
+            beepMinBpm: 30,
+            beepMaxBpm: 300,
+            maxDistance: Math.sqrt(Math.pow(this.mazeWidth, 2) + Math.pow(this.mazeHeight, 2))
+        }
+
         // variabile pt radar
         this.radarCanvas = document.getElementById('radarCanvas');
         this.ctx = this.radarCanvas ? this.radarCanvas.getContext('2d') : null;
@@ -50,6 +56,12 @@ class MazeGame {
         
         this.animate = this.animate.bind(this);
         this.animate();
+    }
+
+    distanceToBpm(distance) {
+        const normalized = Math.min(distance / this.pd.maxDistance, 1);
+        const bpmRange = this.pd.beepMaxBpm - this.pd.beepMinBpm;
+        return this.pd.beepMinBpm + (1 - normalized) * bpmRange;
     }
 
     initScene() {
@@ -207,7 +219,13 @@ class MazeGame {
     setupControls() {
         this.controls = new PointerLockControls(this.camera, document.body);
 
-        this.ui.instructions.addEventListener('click', () => this.controls.lock());
+        this.ui.instructions.addEventListener('click', (event) => {
+            const target = event.target;
+            if(target.classList.contains('preventEvent')) {
+                return;
+            }
+            this.controls.lock();
+        });
         
         this.controls.addEventListener('lock', () => {
             this.ui.instructions.style.display = 'none';
@@ -215,6 +233,8 @@ class MazeGame {
             if (this.radarCanvas) {
                 this.radarCanvas.style.display = 'block';
             }
+
+            updateSlider_beep_toggle(1.0);
         });
         
         this.controls.addEventListener('unlock', () => {
@@ -223,6 +243,7 @@ class MazeGame {
             if (this.radarCanvas) {
                 this.radarCanvas.style.display = 'none';
             }
+            updateSlider_beep_toggle(0.0);
         });
 
         document.addEventListener('keydown', (event) => {
@@ -232,7 +253,13 @@ class MazeGame {
                 this.keys[key] = true;
             }
 
-            if(event.code === 'Space' && this.controls.isLocked && !this.isPathActive && this.spotLight.intensity > 0) {
+            if(event.code === 'Space' && this.controls.isLocked && !this.isPathActive && this.spotLight.intensity > 0) { 
+                try{
+                    updateSlider_toggle_bang(1.0);
+                }
+                catch{
+                    // Audio not started
+                }
                 this.triggerPathfinder();
             }
         });
@@ -432,6 +459,15 @@ class MazeGame {
 
             const distance = this.camera.position.distanceTo(this.targetMesh.position);
             this.ui.distance.innerText = distance.toFixed(1);
+
+            const beepBpm = this.distanceToBpm(distance);
+            // console.log(`Distance: ${distance.toFixed(2)}, BPM: ${beepBpm.toFixed(0)}`);
+            try{
+                updateSlider_beep_bpm(beepBpm);
+            }
+            catch{
+                // Audio not started
+            }
 
             if (distance < 1.5) {
                 this.isLevelComplete = true;
