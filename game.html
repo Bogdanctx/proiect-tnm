@@ -35,11 +35,12 @@
 
     <div id="ui">
         Distance to Target: <span id="distVal">...</span><br>
-        Finder Power: <span id="powerVal">100</span>%
-        
+        Finder Power: <span id="powerVal">100</span>%<br>
+        <span id="objective">Pasul 1: Gaseste switch-ul!</span>
     </div>
-    <div id="levelComplete">
-        OBJECT FOUND! GENERATING NEXT LEVEL...
+    <div id="levelComplete" style="flex-direction: column;">
+        <div>NETWORK RESTORED!</div>
+        <img id="finishGif" src="finish.gif" style="display:none; margin-top: 20px; max-width: 400px;">
     </div>
 
     <script type="module" src="game.js"></script>
