@@ -9,6 +9,13 @@ class MazeGame {
         this.wallSize = 2.5;
         this.wallHeight = 4.0;
         this.maxLight = 100;
+
+        this.mazeObjects = {
+            EMPTY: 0,
+            WALL: 1,
+            START: 2,
+            TARGET: 3
+        }
         
         
         this.isLevelComplete = false;
@@ -23,7 +30,7 @@ class MazeGame {
         this.direction = new THREE.Vector3();
         this.prevTime = performance.now();
         this.walls = []; // pentru coliziuni
-        this.mazeMap = []; // matricea care reprezinta labirintul (0 = spatiu liber, 1 = perete, 2 = start, 3 = target)
+        this.mazeMap = []; // matricea care reprezinta labirintul
 
         // pozitie obiect de cautat
         this.targetRow = 0;
@@ -84,48 +91,55 @@ class MazeGame {
         });
     }
 
+    isValidCell(row, column) {
+        return row > 0 && row < this.mazeHeight - 1 && column > 0 && column < this.mazeWidth - 1;
+    }
+
     generateMazeLogic(width, height) {
         width = width % 2 === 0 ? width + 1 : width;
         height = height % 2 === 0 ? height + 1 : height;
 
-        const maze = Array(height).fill().map(() => Array(width).fill(1)); // maze = matrice initiala plina de pereti
+        const maze = Array(height).fill().map(() => Array(width).fill(this.mazeObjects.WALL));
         const directions = [ [0, -2], [0, 2], [-2, 0], [2, 0] ];
 
         // aplic dfs pentru a genera un labirint perfect (fara bucle) 
         // si apoi adaug niste bucle random
         const carve = (x, y) => {
-            maze[y][x] = 0;
-            directions.sort(() => Math.random() - 0.5);
+            maze[y][x] = this.mazeObjects.EMPTY;
+            directions.sort(() => Math.random() - 0.5); // amestec directiile pentru a avea labirinturi diferite de fiecare data
+
             for(let [dx, dy] of directions) {
                 let new_x = x + dx, new_y = y + dy;
-                if (new_y > 0 && new_y < height - 1 && new_x > 0 && new_x < width - 1 && maze[new_y][new_x] === 1) {
-                    maze[y + dy / 2][x + dx / 2] = 0;
+                if (this.isValidCell(new_y, new_x) && maze[new_y][new_x] === this.mazeObjects.WALL) {
+                    maze[y + dy / 2][x + dx / 2] = this.mazeObjects.EMPTY;
                     carve(new_x, new_y);
                 }
             }
         };
+
+        // generarea initiala a labirintului
         carve(1, 1);
 
         // adaug niste bucle random
         const loopFactor = 0.08;
         for(let row = 1; row < height - 1; row++) {
             for(let column = 1; column < width - 1; column++) {
-                if(maze[row][column] === 1 && Math.random() < loopFactor) {
-                    if ((maze[row-1][column] === 0 && maze[row+1][column] === 0) || (maze[row][column-1] === 0 && maze[row][column+1] === 0)) {
-                        maze[row][column] = 0;
+                if(maze[row][column] === this.mazeObjects.WALL && Math.random() < loopFactor) {
+                    if ((maze[row-1][column] === this.mazeObjects.EMPTY && maze[row+1][column] === this.mazeObjects.EMPTY) || (maze[row][column-1] === this.mazeObjects.EMPTY && maze[row][column+1] === this.mazeObjects.EMPTY)) {
+                        maze[row][column] = this.mazeObjects.EMPTY;
                     }
                 }
             }
         }
 
-        maze[1][1] = 2; // pozitia de start a jucatorului
+        maze[1][1] = this.mazeObjects.START; // pozitia de start a jucatorului
 
 
         // spawnez un obiect intr-un loc random din labirint, cat mai departe de start
         const validSpots = [];
         for (let row = 1; row < height - 1; row++) {
             for (let column = 1; column < width - 1; column++) {
-                if (maze[row][column] === 0 && row + column > 15) {
+                if (maze[row][column] === this.mazeObjects.EMPTY && row + column > 15) {
                     validSpots.push({ 
                         r: row, 
                         c: column 
@@ -138,7 +152,7 @@ class MazeGame {
         const randomSpot = validSpots[Math.floor(Math.random() * validSpots.length)];
         this.targetRow = randomSpot.r;
         this.targetCol = randomSpot.c;
-        maze[this.targetRow][this.targetCol] = 3;
+        maze[this.targetRow][this.targetCol] = this.mazeObjects.TARGET;
 
         return maze;
     }
