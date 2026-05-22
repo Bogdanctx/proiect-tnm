@@ -22,7 +22,6 @@ class MazeGame {
         
         
         this.isLevelComplete = false;
-        this.isPathActive = false;
         this.keys = { 
             w: false, 
             a: false, 
@@ -55,13 +54,9 @@ class MazeGame {
         this.routerColumn = 0;
         this.hasTheRouter = false;
 
-
-
-
         // elementele de ui
         this.ui = {
             instructions: document.getElementById('instructions'),
-            distance: document.getElementById('distVal'),
             power: document.getElementById('powerVal'),
             levelComplete: document.getElementById('levelComplete'),
             objective: document.getElementById('objective'),
@@ -128,10 +123,6 @@ class MazeGame {
         this.camera.add(this.spotLight.target);
         this.spotLight.target.position.set(0, 0, -1);
         this.scene.add(this.camera);
-
-        // pentru a afisa path-ul ca hint
-        this.pathGroup = new THREE.Group();
-        this.scene.add(this.pathGroup);
         
         // raycaster pentru coliziuni
         this.raycaster = new THREE.Raycaster();
@@ -350,9 +341,14 @@ class MazeGame {
 
             // daca apas space, lanterna are baterie, pathfinder-ul nu e deja activ si player-ul are controlul, atunci activez pathfinder-ul care arata drumul catre tinta pentru cateva secunde
             if(event.code === 'Space' && this.controls.isLocked && !this.isPathActive && this.spotLight.intensity > 20) {
+                updateSlider_toggle_bang(1.0); 
 
-                updateSlider_toggle_bang(1.0);                
-                this.triggerPathfinder();
+                this.radarActiveTimer = 6.0;
+                this.radarSweepRadius = 0;
+                this.targetRevealTimer = 0;
+                
+                this.spotLight.intensity = Math.max(0, this.spotLight.intensity - 10);
+                this.ui.power.innerText = Math.round((this.spotLight.intensity / this.maxLight) * 100);
             }
         });
 
@@ -363,97 +359,6 @@ class MazeGame {
                 this.keys[key] = false;
             }
         });
-    }
-
-    triggerPathfinder() {
-        this.isPathActive = true;
-        this.spotLight.intensity = Math.max(0, this.spotLight.intensity - 10);
-        this.ui.power.innerText = Math.round((this.spotLight.intensity / this.maxLight) * 100);
-
-        this.radarActiveTimer = 6.0;
-        this.radarSweepRadius = 0;
-        this.targetRevealTimer = 0;
-
-        const pCol = Math.round(this.camera.position.x / this.wallSize + this.mazeWidth / 2);
-        const pRow = Math.round(this.camera.position.z / this.wallSize + this.mazeHeight / 2);
-
-        let path = [];
-
-        if (!this.hasTheSwitch) {
-            path = this.getShortestPath(pRow, pCol, this.switchRow, this.switchColumn);
-        }
-        else {
-            path = this.getShortestPath(pRow, pCol, this.routerRow, this.routerColumn);
-        }
-
-        this.pathGroup.clear();
-        const pointMat = new THREE.MeshBasicMaterial({ 
-            color: 0x00ffcc 
-        });
-        const pointGeo = new THREE.SphereGeometry(0.15);
-
-        path.forEach(p => {
-            const px = (p.column - this.mazeWidth / 2) * this.wallSize;
-            const pz = (p.row - this.mazeHeight / 2) * this.wallSize;
-            const point = new THREE.Mesh(pointGeo, pointMat);
-            point.position.set(px, 0.2, pz);
-            this.pathGroup.add(point);
-        });
-
-        // dupa 6 secunde, sterg path-ul si dezactivez pathfinder-ul
-        setTimeout(() => {
-            this.pathGroup.clear();
-            this.isPathActive = false;
-        }, 6000);
-    }
-
-    getShortestPath(startRow, startCol, endRow, endCol) {
-        let queue = [[startRow, startCol]];
-        let cameFrom = []
-        
-        cameFrom[startRow] = [];
-        cameFrom[startRow][startCol] = null;
-        
-        // BFS pentru a gasi cel mai scurt drum de la pozitia jucatorului la tinta
-        while (queue.length > 0) {
-            const [row, col] = queue.shift();
-            
-            if (row === endRow && col === endCol) {
-                break;
-            }
-
-            const directions = [[0, 1], [1, 0], [0, -1], [-1, 0]];
-
-            for(let [dr, dc] of directions) {
-                const new_row = row + dr;
-                const new_col = col + dc;
-
-                if (this.isValidCell(new_row, new_col) && this.mazeMap[new_row][new_col] !== this.mazeObjects.WALL) {
-                    
-                    if (!cameFrom[new_row]) {
-                        cameFrom[new_row] = [];
-                    }
-
-                    if (cameFrom[new_row][new_col] === undefined) {
-                        queue.push([new_row, new_col]);
-                        cameFrom[new_row][new_col] = [row, col];
-                    }
-
-                }
-            }
-        }
-
-        // reconstruiesc path-ul de la tinta la jucator folosind cameFrom
-        let current = [endRow, endCol];
-        let path = [];
-
-        while (current !== null) {
-            const [row, column] = current;
-            path.push({row, column});
-            current = cameFrom[row][column];
-        }
-
-        return path.reverse();
     }
 
     drawRadar(delta) {
@@ -567,7 +472,6 @@ class MazeGame {
         if (this.controls.isLocked) {
             const targetPosition = !this.hasTheSwitch ? this.switchMesh.position : this.routerMesh.position;
             const currentDistance = this.camera.position.distanceTo(targetPosition);
-            this.ui.distance.innerText = currentDistance.toFixed(1);
 
             const beepBpm = this.distanceToBpm(currentDistance);
             try {
